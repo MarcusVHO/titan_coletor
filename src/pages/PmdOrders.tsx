@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { apiFetch } from '@/services/api'
 import { logout } from '@/services/auth'
 
@@ -22,6 +22,10 @@ export default function PmdOrders() {
   const [error, setError] = useState<string | undefined>()
   const [orders, setOrders] = useState<Order[]>([])
   const [filter, setFilter] = useState<'all' | 'pending' | 'completed' | 'canceled'>('pending')
+  const scanRef = useRef<HTMLInputElement>(null)
+  const [scanning, setScanning] = useState(false)
+  const [flash, setFlash] = useState<string | undefined>()
+  const flashTimer = useRef<number | null>(null)
   const goBack = () => {
     if (window.history.length > 1) window.history.back()
     else window.location.href = '/dashboard'
@@ -48,6 +52,63 @@ export default function PmdOrders() {
     fetchOrders()
   }, [])
 
+  useEffect(() => {
+    scanRef.current?.focus()
+  }, [])
+
+  useEffect(() => {
+    if (!scanning) scanRef.current?.focus()
+  }, [scanning])
+
+  async function onScanSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    const val = scanRef.current?.value?.trim()
+    if (!val) return
+    setScanning(true)
+    if (flashTimer.current) {
+      window.clearTimeout(flashTimer.current)
+      flashTimer.current = null
+    }
+    try {
+      const res = await apiFetch<unknown>(
+        `/tobacco_conference/get_data_for_conference?order=${encodeURIComponent(val)}`,
+        { method: 'GET', auth: true },
+      )
+      type MaybeRes = { success?: unknown; message?: unknown; data?: unknown }
+      const anyRes = res as MaybeRes | undefined
+      const isErr =
+        anyRes &&
+        typeof anyRes === 'object' &&
+        'success' in anyRes &&
+        anyRes.success === false
+      if (isErr) {
+        const rawMsg = typeof anyRes?.message === 'string' ? (anyRes.message as string) : ''
+        const msg =
+          /incorrect/i.test(rawMsg) ? 'Ordem incorreta!' : 'Ordem não encontrada'
+        setFlash(msg)
+        flashTimer.current = window.setTimeout(() => {
+          setFlash(undefined)
+          flashTimer.current = null
+        }, 3000)
+      } else {
+        window.location.href = `/conference?order=${encodeURIComponent(val)}`
+      }
+    } catch (e) {
+      const raw = e instanceof Error ? e.message : 'Falha ao buscar ordem'
+      const msg = /incorrect/i.test(raw) ? 'Ordem incorreta!' : 'Ordem não encontrada'
+      setFlash(msg)
+      flashTimer.current = window.setTimeout(() => {
+        setFlash(undefined)
+        flashTimer.current = null
+      }, 3000)
+    } finally {
+      setScanning(false)
+      if (scanRef.current) {
+        scanRef.current.focus()
+      }
+    }
+  }
+
   return (
     <div className="list__container">
       <div className="list__header">
@@ -60,6 +121,21 @@ export default function PmdOrders() {
           <button className="logout" onClick={logout} aria-label="Sair">Sair</button>
         </div>
       </div>
+      <form className="list__scan" onSubmit={onScanSubmit}>
+        <input
+          ref={scanRef}
+          type="text"
+          className="conf__scan-input"
+          placeholder="Bipe o número da OP"
+          aria-label="Leitura de OP"
+          inputMode="none"
+          enterKeyHint="go"
+          readOnly={scanning}
+          onBlur={() => {
+            setTimeout(() => scanRef.current?.focus(), 0)
+          }}
+        />
+      </form>
       <div className="list__filters" role="tablist" aria-label="Filtrar por status">
         <button
           className={`chip ${filter === 'all' ? 'chip--active' : ''}`}
@@ -96,6 +172,11 @@ export default function PmdOrders() {
       </div>
       {loading && <div className="list__state">Carregando…</div>}
       {error && !loading && <div className="list__alert">{error}</div>}
+      {flash && (
+        <div className="conf__overlay conf__overlay--error" role="alert" aria-live="assertive">
+          <div className="conf__overlay-message">{flash}</div>
+        </div>
+      )}
       {!loading && !error && (
         <ul className="list">
           {orders

@@ -366,6 +366,9 @@ button:focus-visible {
   flex: 1;
   text-align: center;
 }
+.list__scan {
+  padding: .25rem 0;
+}
 .list__filters {
   display: flex;
   flex-wrap: wrap;
@@ -631,6 +634,34 @@ button:focus-visible {
   color: #ffb3b3;
   background: rgba(255, 59, 59, 0.15);
   border-color: rgba(255, 59, 59, 0.3);
+}
+
+/* Fullscreen overlay for transient alerts on scanners */
+.conf__overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.5);
+  pointer-events: none;
+}
+.conf__overlay-message {
+  max-width: 90%;
+  text-align: center;
+  font-size: 1.2rem;
+  line-height: 1.3;
+  padding: 1rem 1.2rem;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(17,17,17,0.92);
+  box-shadow: 0 10px 24px rgba(0,0,0,0.35);
+}
+.conf__overlay--error .conf__overlay-message {
+  color: #ffdddd;
+  border-color: rgba(255, 59, 59, 0.5);
+  background: rgba(120, 0, 0, 0.85);
 }
 @media (max-width: 420px) {
   .conf__container {

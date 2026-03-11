@@ -115,16 +115,44 @@ export default function Conference() {
     setError(undefined)
     ;(async () => {
       try {
-        const res = await apiFetch<Response>(
+        const res = await apiFetch<unknown>(
           `/tobacco_conference/check_item?order=${encodeURIComponent(
             orderParam,
           )}&check_text=${encodeURIComponent(value)}`,
           { method: 'POST', auth: true },
         )
-        setData(res.data)
-        if (inputRef.current) {
-          inputRef.current.value = ''
-          inputRef.current.focus()
+        type MaybeRes = { success?: unknown; message?: unknown; data?: unknown }
+        const anyRes = res as MaybeRes | undefined
+        const isErr =
+          anyRes &&
+          typeof anyRes === 'object' &&
+          'success' in anyRes &&
+          anyRes.success === false
+        if (isErr) {
+          const rawMsg = typeof anyRes?.message === 'string' ? (anyRes.message as string) : ''
+          const msg = /incorrect/i.test(rawMsg) ? 'Item incorreto!' : 'Falha ao conferir item'
+          if (flashTimer.current) {
+            window.clearTimeout(flashTimer.current)
+            flashTimer.current = null
+          }
+          setFlash(msg)
+          if (inputRef.current) {
+            inputRef.current.value = ''
+            inputRef.current.focus()
+          }
+          flashTimer.current = window.setTimeout(() => {
+            setFlash(undefined)
+            flashTimer.current = null
+          }, 3000)
+        } else {
+          const okRes = anyRes as { data?: unknown }
+          if (okRes && okRes.data && typeof okRes.data === 'object') {
+            setData(okRes.data as ConferenceData)
+          }
+          if (inputRef.current) {
+            inputRef.current.value = ''
+            inputRef.current.focus()
+          }
         }
       } catch (e) {
         const raw = e instanceof Error ? e.message : 'Falha ao conferir item'
@@ -135,6 +163,10 @@ export default function Conference() {
           flashTimer.current = null
         }
         setFlash(msg)
+        if (inputRef.current) {
+          inputRef.current.value = ''
+          inputRef.current.focus()
+        }
         flashTimer.current = window.setTimeout(() => {
           setFlash(undefined)
           flashTimer.current = null
@@ -188,8 +220,8 @@ export default function Conference() {
       {loading && <div className="list__state">Carregando…</div>}
       {error && !loading && <div className="list__alert">{error}</div>}
       {flash && (
-        <div className="conf__banner conf__banner--error" role="alert">
-          {flash}
+        <div className="conf__overlay conf__overlay--error" role="alert" aria-live="assertive">
+          <div className="conf__overlay-message">{flash}</div>
         </div>
       )}
 
